@@ -3,6 +3,7 @@
 
 import os
 import random
+from pathlib import Path
 from time import time
 
 import pytest
@@ -10,7 +11,7 @@ import pytest
 from custom_components.gismeteo.cache import Cache
 
 
-@pytest.fixture()
+@pytest.fixture
 def config(tmpdir):
     """Cache controller tests."""
     return {
@@ -19,7 +20,7 @@ def config(tmpdir):
     }
 
 
-@pytest.fixture()
+@pytest.fixture
 def cache_dir(config):
     """Fill in temp dir with test files."""
     now = time()
@@ -29,8 +30,8 @@ def cache_dir(config):
     for _ in range(old):
         file_name = os.urandom(4).hex()
         content = os.urandom(7).hex()
-        file_path = os.path.join(config["cache_dir"], file_name)
-        with open(file_path, "w", encoding="utf8") as fp:
+        file_path = Path(config["cache_dir"]) / file_name
+        with Path.open(file_path, "w", encoding="utf8") as fp:
             fp.write(content)
 
         mtime = now - 60 - random.randint(0, 180)
@@ -40,8 +41,8 @@ def cache_dir(config):
     for _ in range(8 - old):
         file_name = os.urandom(4).hex()
         content = os.urandom(7).hex()
-        file_path = os.path.join(config["cache_dir"], file_name)
-        with open(file_path, "w", encoding="utf8") as fp:
+        file_path = Path(config["cache_dir"]) / file_name
+        with Path.open(file_path, "w", encoding="utf8") as fp:
             fp.write(content)
 
         mtime = now - random.randint(0, 59)
@@ -71,7 +72,7 @@ def test__get_file_path():
         }
     )
 
-    assert cache._get_file_path("file_name.ext") == "/some/dir/file_name.ext"
+    assert str(cache._get_file_path("file_name.ext")) == "/some/dir/file_name.ext"
 
     cache = Cache(
         {
@@ -79,7 +80,7 @@ def test__get_file_path():
         }
     )
 
-    assert cache._get_file_path("file_name.ext") == "/some/dir/file_name.ext"
+    assert str(cache._get_file_path("file_name.ext")) == "/some/dir/file_name.ext"
 
     cache = Cache(
         {
@@ -88,7 +89,7 @@ def test__get_file_path():
         }
     )
 
-    assert cache._get_file_path("file_name.ext") == "/some/dir/dmn.file_name.ext"
+    assert str(cache._get_file_path("file_name.ext")) == "/some/dir/dmn.file_name.ext"
 
     cache = Cache(
         {
@@ -97,7 +98,7 @@ def test__get_file_path():
         }
     )
 
-    assert cache._get_file_path("file_name.ext") == "/some/dir/dmn.file_name.ext"
+    assert str(cache._get_file_path("file_name.ext")) == "/some/dir/dmn.file_name.ext"
 
 
 def test_is_cached(config, cache_dir):
@@ -116,25 +117,25 @@ def test_is_cached(config, cache_dir):
         assert cache.is_cached(file_name) is False
 
 
-def test_read_cache(config, cache_dir):
+async def test_async_read_cache(config, cache_dir):
     """Cache controller tests."""
     cache = Cache(config)
 
     for i in cache_dir["old"]:
-        assert cache.read_cache(i) is None
+        assert await cache.async_read_cache(i) is None
 
     for i, con in cache_dir["new"].items():
-        assert cache.read_cache(i) == con
+        assert await cache.async_read_cache(i) == con
 
 
-def test_save_cache(config):
+async def test_async_save_cache(config):
     """Cache controller tests."""
-    config["cache_dir"] = os.path.join(config["cache_dir"], os.urandom(3).hex())
+    config["cache_dir"] = str(Path(config["cache_dir"]) / os.urandom(3).hex())
     cache = Cache(config)
 
     for _ in range(8):
         file_name = os.urandom(5).hex()
         content = os.urandom(7).hex()
-        cache.save_cache(file_name, content)
+        await cache.async_save_cache(file_name, content)
 
-        assert cache.read_cache(file_name) == content
+        assert await cache.async_read_cache(file_name) == content

@@ -1,23 +1,24 @@
 #  Copyright (c) 2019-2024, Andrey "Limych" Khrolenok <andrey@khrolenok.ru>
 #  Creative Commons BY-NC-SA 4.0 International Public License
 #  (see LICENSE.md or https://creativecommons.org/licenses/by-nc-sa/4.0/)
-"""The Gismeteo component.
+"""
+The Gismeteo component.
 
 For more details about this platform, please refer to the documentation at
 https://github.com/Limych/ha-gismeteo/
 """
 
-from collections.abc import Callable
-from datetime import datetime, timedelta
-from http import HTTPStatus
 import logging
 import math
-from typing import Any
-import xml.etree.ElementTree as etree  # type: ignore
+from collections.abc import Callable
+from datetime import datetime, timedelta
+from enum import Enum
+from http import HTTPStatus
+from typing import Any, Final
 
+import defusedxml.ElementTree as ETree
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
-
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
@@ -50,7 +51,8 @@ from homeassistant.components.weather import (
 )
 from homeassistant.const import ATTR_ID, ATTR_LATITUDE, ATTR_LONGITUDE
 from homeassistant.helpers.typing import StateType
-from homeassistant.util import Throttle, dt as dt_util
+from homeassistant.util import Throttle
+from homeassistant.util import dt as dt_util
 
 from .cache import Cache
 from .const import (
@@ -79,27 +81,29 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+MAX_LATITUDE: Final = 90
+MAX_LONGITUDE: Final = 180
+
 
 class InvalidCoordinatesError(Exception):
     """Raised when coordinates are invalid."""
 
-    def __init__(self, status):
+    def __init__(self) -> None:
         """Initialize."""
-        super().__init__(status)
-        self.status = status
+        super().__init__("Your coordinates are invalid.")
 
 
 class ApiError(Exception):
     """Raised when Gismeteo API request ended in error."""
 
-    def __init__(self, status):
+    def __init__(self, status: Any) -> None:
         """Initialize."""
         super().__init__(status)
-        self.status = status
 
 
 class GismeteoForecast(Forecast, total=False):
-    """Typed weather forecast dict.
+    """
+    Typed weather forecast dict.
 
     All attributes are in native units.
     """
@@ -114,10 +118,15 @@ class GismeteoForecast(Forecast, total=False):
     road_condition: str | None
 
 
+class _GettingMethod(Enum):
+    REGULAR = 0
+    AS_BROWSER = 1
+
+
 class GismeteoApiClient:
     """Gismeteo API implementation."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         session: ClientSession,
         location_key: int | None = None,
@@ -144,7 +153,7 @@ class GismeteoApiClient:
                 ATTR_LONGITUDE: longitude,
             }
         else:
-            raise InvalidCoordinatesError("Your coordinates are invalid.")
+            raise InvalidCoordinatesError
 
         self._current = {}
         self._forecast_hourly = []
@@ -155,13 +164,17 @@ class GismeteoApiClient:
     def _valid_coordinates(latitude: float, longitude: float) -> bool:
         """Return True if coordinates are valid."""
         try:
-            assert isinstance(latitude, int | float) and isinstance(
-                longitude, int | float
-            )
-            assert abs(latitude) <= 90 and abs(longitude) <= 180
-        except (AssertionError, TypeError):
+            if (
+                not isinstance(latitude, int | float)
+                or not isinstance(longitude, int | float)
+                or abs(latitude) > MAX_LATITUDE
+                or abs(longitude) > MAX_LONGITUDE
+            ):
+                return False
+        except TypeError:
             return False
-        return True
+        else:
+            return True
 
     @property
     def attributes(self) -> dict[str, Any] | None:
@@ -173,7 +186,9 @@ class GismeteoApiClient:
         """Return current weather data."""
         return self._current
 
-    def forecast_data(self, pos: int, mode: str = ForecastMode.HOURLY):
+    def forecast_data(
+        self, pos: int, mode: str = ForecastMode.HOURLY
+    ) -> dict[str, Any]:
         """Return forecast data."""
         now = dt_util.now()
         forecast = []
@@ -198,7 +213,10 @@ class GismeteoApiClient:
             return {}
 
     async def _async_get_data(
-        self, url: str, cache_fname: str | None = None, as_browser: bool = False
+        self,
+        url: str,
+        cache_fname: str | None = None,
+        method: _GettingMethod = _GettingMethod.REGULAR,
     ) -> str:
         """Retreive data from Gismeteo API and cache results."""
         _LOGGER.debug("Requesting URL %s", url)
@@ -207,20 +225,21 @@ class GismeteoApiClient:
             cache_fname += ".xml"
             if self._cache.is_cached(cache_fname):
                 _LOGGER.debug("Cached response used")
-                return self._cache.read_cache(cache_fname)
+                return await self._cache.async_read_cache(cache_fname)
 
         headers = {}
-        if as_browser:
+        if method is _GettingMethod.AS_BROWSER:
             headers["User-Agent"] = PARSER_USER_AGENT
 
         async with self._session.get(url, headers=headers) as resp:
             if resp.status != HTTPStatus.OK:
-                raise ApiError(f"Invalid response from Gismeteo API: {resp.status}")
+                msg = f"Invalid response from Gismeteo API: {resp.status}"
+                raise ApiError(msg)
             _LOGGER.debug("Data retrieved from %s, status: %s", url, resp.status)
             data = await resp.text()
 
         if self._cache and cache_fname is not None and data:
-            self._cache.save_cache(cache_fname, data)
+            await self._cache.async_save_cache(cache_fname, data)
 
         return data
 
@@ -233,14 +252,17 @@ class GismeteoApiClient:
             return
 
         url = (
-            ENDPOINT_URL
-            + f"/cities/?lat={self._attributes[ATTR_LATITUDE]}&lng={self._attributes[ATTR_LONGITUDE]}&count=1&lang=en"
+            ENDPOINT_URL + f"/cities/?lat={self._attributes[ATTR_LATITUDE]}"
+            f"&lng={self._attributes[ATTR_LONGITUDE]}&count=1&lang=en"
         )
-        cache_fname = f"location_{self._attributes[ATTR_LATITUDE]}_{self._attributes[ATTR_LONGITUDE]}"
+        cache_fname = (
+            f"location_{self._attributes[ATTR_LATITUDE]}"
+            f"_{self._attributes[ATTR_LONGITUDE]}"
+        )
 
         response = await self._async_get_data(url, cache_fname)
         try:
-            xml = etree.fromstring(response)
+            xml = ETree.fromstring(response)
             item = xml.find("item")
             self._attributes = {
                 ATTR_ID: self._get(item, "id", int),
@@ -248,12 +270,11 @@ class GismeteoApiClient:
                 ATTR_LONGITUDE: self._get(item, "lng", float),
             }
 
-        except (etree.ParseError, TypeError, AttributeError) as ex:
-            raise ApiError(
-                "Can't retrieve location data! Invalid server response."
-            ) from ex
+        except (ETree.ParseError, TypeError, AttributeError) as ex:
+            msg = "Can't retrieve location data! Invalid server response."
+            raise ApiError(msg) from ex
 
-    async def async_get_forecast(self):
+    async def async_get_forecast(self) -> str:
         """Get the latest forecast data from Gismeteo API."""
         if ATTR_ID not in self.attributes:
             await self.async_update_location()
@@ -269,7 +290,7 @@ class GismeteoApiClient:
     async def async_get_parsed(self) -> dict[str, Any]:
         """Retrieve data from Gismeteo main site."""
         forecast = await self.async_get_forecast()
-        location = etree.fromstring(forecast).find("location")
+        location = ETree.fromstring(forecast).find("location")
         location_uri = str(location.get("nowcast_url")).strip("/")[8:]
         tzone = int(location.get("tzone"))
         today = self._get_utime(location.get("cur_time")[:10], tzone)
@@ -278,7 +299,9 @@ class GismeteoApiClient:
         url = PARSER_URL_FORMAT.format(location_uri)
         cache_fname = f"forecast_parsed_{self.attributes[ATTR_ID]}"
 
-        response = await self._async_get_data(url, cache_fname, as_browser=True)
+        response = await self._async_get_data(
+            url, cache_fname, method=_GettingMethod.AS_BROWSER
+        )
 
         parser = BeautifulSoup(response, "html.parser")
 
@@ -294,10 +317,10 @@ class GismeteoApiClient:
                     data.setdefault(ts, {})
                     data[ts][metric] = next(row_data.stripped_strings, None)
 
-            return data
-
         except AttributeError:  # pragma: no cover
             return {}
+        else:
+            return data
 
     @staticmethod
     def _get(var: dict, k: str, func: Callable | None = None) -> StateType:
@@ -309,7 +332,9 @@ class GismeteoApiClient:
                 return None
         return res
 
-    def condition(self, src=None, mode: str = ForecastMode.HOURLY) -> str | None:
+    def condition(  # noqa: PLR0912
+        self, src: dict | None = None, mode: str = ForecastMode.HOURLY
+    ) -> str | None:
         """Return the condition summary."""
         src = src or self._current
 
@@ -327,7 +352,7 @@ class GismeteoApiClient:
                 cond = ATTR_CONDITION_CLEAR_NIGHT  # Clear night
         elif cld == 1:
             cond = ATTR_CONDITION_PARTLYCLOUDY  # A few clouds
-        elif cld == 2:
+        elif cld == 2:  # noqa: PLR2004
             cond = ATTR_CONDITION_PARTLYCLOUDY  # A some clouds
         else:
             cond = ATTR_CONDITION_CLOUDY  # Many clouds
@@ -342,13 +367,13 @@ class GismeteoApiClient:
                 )
         elif pr_type == 1:
             cond = ATTR_CONDITION_RAINY  # Rain
-            if pr_int == 3:
+            if pr_int == 3:  # noqa: PLR2004
                 cond = ATTR_CONDITION_POURING  # Pouring rain
-        elif pr_type == 2:
+        elif pr_type == 2:  # noqa: PLR2004
             cond = ATTR_CONDITION_SNOWY  # Snow
-        elif pr_type == 3:
+        elif pr_type == 3:  # noqa: PLR2004
             cond = ATTR_CONDITION_SNOWY_RAINY  # Snow and Rain
-        elif self.wind_speed(src) > 10.8:
+        elif self.wind_speed(src) > 10.8:  # noqa: PLR2004
             if cond == ATTR_CONDITION_CLOUDY:
                 cond = ATTR_CONDITION_WINDY_VARIANT  # Wind and clouds
             else:
@@ -362,17 +387,17 @@ class GismeteoApiClient:
 
         return cond
 
-    def temperature(self, src=None) -> float | None:
+    def temperature(self, src: dict | None = None) -> float | None:
         """Return the temperature."""
         src = src or self._current
         return src.get(ATTR_FORECAST_NATIVE_TEMP)
 
-    def templow(self, src=None) -> float | None:
+    def templow(self, src: dict | None = None) -> float | None:
         """Return the low temperature of the day."""
         src = src or self._current
         return src.get(ATTR_FORECAST_NATIVE_TEMP_LOW)
 
-    def apparent_temperature(self, src=None) -> float | None:
+    def apparent_temperature(self, src: dict | None = None) -> float | None:
         """Return the apparent temperature."""
         temp = self.temperature(src)
         humi = self.humidity(src)
@@ -384,28 +409,28 @@ class GismeteoApiClient:
         feels = temp + 0.348 * e_value - 0.7 * wind - 4.25
         return round(feels, 1)
 
-    def water_temperature(self, src=None):
+    def water_temperature(self, src: dict | None = None) -> float | None:
         """Return the temperature of water."""
         src = src or self._current
         return src.get(ATTR_FORECAST_WATER_TEMPERATURE)
 
-    def pressure(self, src=None) -> float | None:
+    def pressure(self, src: dict | None = None) -> float | None:
         """Return the pressure in mmHg."""
         src = src or self._current
         return src.get(ATTR_FORECAST_NATIVE_PRESSURE)
 
-    def humidity(self, src=None) -> float | None:
+    def humidity(self, src: dict | None = None) -> float | None:
         """Return the humidity in %."""
         src = src or self._current
         return src.get(ATTR_FORECAST_HUMIDITY)
 
-    def wind_bearing(self, src=None) -> float | str | None:
+    def wind_bearing(self, src: dict | None = None) -> float | str | None:
         """Return the wind bearing."""
         src = src or self._current
         bearing = int(src.get(ATTR_FORECAST_WIND_BEARING, 0))
         return (bearing - 1) * 45 if bearing > 0 else None
 
-    def wind_bearing_label(self, src=None) -> str | None:
+    def wind_bearing_label(self, src: dict | None = None) -> str | None:
         """Return the wind bearing."""
         src = src or self._current
         bearing = int(src.get(ATTR_FORECAST_WIND_BEARING, 0))
@@ -422,20 +447,20 @@ class GismeteoApiClient:
                 8: "nw",
             }[bearing]
         except KeyError:  # pragma: no cover
-            _LOGGER.error('Unknown wind bearing value "%s"', bearing)
+            _LOGGER.exception('Unknown wind bearing value "%s"', bearing)
             return None
 
-    def wind_gust_speed(self, src=None) -> float | None:
+    def wind_gust_speed(self, src: dict | None = None) -> float | None:
         """Return the wind gust speed in m/s."""
         src = src or self._current
         return src.get(ATTR_FORECAST_NATIVE_WIND_GUST_SPEED)
 
-    def wind_speed(self, src=None) -> float | None:
+    def wind_speed(self, src: dict | None = None) -> float | None:
         """Return the wind speed in m/s."""
         src = src or self._current
         return src.get(ATTR_FORECAST_NATIVE_WIND_SPEED)
 
-    def precipitation_type(self, src=None) -> str | None:
+    def precipitation_type(self, src: dict | None = None) -> str | None:
         """Return the precipitation type."""
         src = src or self._current
         pt = src.get(ATTR_FORECAST_PRECIPITATION_TYPE)
@@ -447,15 +472,15 @@ class GismeteoApiClient:
                 3: "snow-rain",
             }[pt]
         except KeyError:  # pragma: no cover
-            _LOGGER.error('Unknown precipitation type value "%s"', pt)
+            _LOGGER.exception('Unknown precipitation type value "%s"', pt)
             return None
 
-    def precipitation_amount(self, src=None) -> float | None:
+    def precipitation_amount(self, src: dict | None = None) -> float | None:
         """Return the precipitation amount in mm."""
         src = src or self._current
         return src.get(ATTR_FORECAST_PRECIPITATION_AMOUNT)
 
-    def precipitation_intensity(self, src=None) -> str | None:
+    def precipitation_intensity(self, src: dict | None = None) -> str | None:
         """Return the precipitation intensity."""
         src = src or self._current
         pt = src.get(ATTR_FORECAST_PRECIPITATION_INTENSITY)
@@ -467,20 +492,20 @@ class GismeteoApiClient:
                 3: "heavy",
             }[pt]
         except KeyError:  # pragma: no cover
-            _LOGGER.error('Unknown precipitation type value "%s"', pt)
+            _LOGGER.exception('Unknown precipitation type value "%s"', pt)
             return None
 
-    def cloud_coverage(self, src=None) -> float | None:
+    def cloud_coverage(self, src: dict | None = None) -> float | None:
         """Return the cloud coverage amount in percents."""
         src = src or self._current
         cloudiness = src.get(ATTR_FORECAST_CLOUD_COVERAGE)
         return (
             50
-            if cloudiness == 101
+            if cloudiness == 101  # noqa: PLR2004
             else int(cloudiness * 100 / 3) if cloudiness is not None else None
         )
 
-    def rain_amount(self, src=None) -> float | None:
+    def rain_amount(self, src: dict | None = None) -> float | None:
         """Return the rain amount in mm."""
         src = src or self._current
         return (
@@ -492,7 +517,7 @@ class GismeteoApiClient:
             else 0
         )
 
-    def snow_amount(self, src=None) -> float | None:
+    def snow_amount(self, src: dict | None = None) -> float | None:
         """Return the snow amount in mm."""
         src = src or self._current
         return (
@@ -504,37 +529,37 @@ class GismeteoApiClient:
             else 0
         )
 
-    def is_storm(self, src=None) -> bool | None:
+    def is_storm(self, src: dict | None = None) -> bool | None:
         """Return True if storm."""
         src = src or self._current
         return src.get(ATTR_FORECAST_IS_STORM)
 
-    def geomagnetic_field(self, src=None) -> int | None:
+    def geomagnetic_field(self, src: dict | None = None) -> int | None:
         """Return geomagnetic field index."""
         src = src or self._current
         return src.get(ATTR_FORECAST_GEOMAGNETIC_FIELD)
 
-    def pollen_birch(self, src=None) -> int | None:
+    def pollen_birch(self, src: dict | None = None) -> int | None:
         """Return birch pollen value."""
         src = src or self.forecast_data(0, ForecastMode.DAILY)
         return src.get(ATTR_FORECAST_POLLEN_BIRCH)
 
-    def pollen_grass(self, src=None) -> int | None:
+    def pollen_grass(self, src: dict | None = None) -> int | None:
         """Return grass pollen value."""
         src = src or self.forecast_data(0, ForecastMode.DAILY)
         return src.get(ATTR_FORECAST_POLLEN_GRASS)
 
-    def pollen_ragweed(self, src=None) -> int | None:
+    def pollen_ragweed(self, src: dict | None = None) -> int | None:
         """Return grass pollen value."""
         src = src or self.forecast_data(0, ForecastMode.DAILY)
         return src.get(ATTR_FORECAST_POLLEN_RAGWEED)
 
-    def uv_index(self, src=None) -> float | None:
+    def uv_index(self, src: dict | None = None) -> float | None:
         """Return UV index."""
         src = src or self.forecast_data(0, ForecastMode.DAILY)
         return src.get(ATTR_FORECAST_UV_INDEX)
 
-    def road_condition(self, src=None) -> str | None:
+    def road_condition(self, src: dict | None = None) -> str | None:
         """Return road condition."""
         src = src or self.forecast_data(0, ForecastMode.DAILY)
         rc = src.get(ATTR_FORECAST_ROAD_CONDITION)
@@ -549,7 +574,7 @@ class GismeteoApiClient:
         try:
             return rcs[rc]
         except KeyError:  # pragma: no cover
-            _LOGGER.error('Unknown road condition value "%s"', rc)
+            _LOGGER.exception('Unknown road condition value "%s"', rc)
             return None
 
     def forecast(self, mode: str = ForecastMode.HOURLY) -> list[GismeteoForecast]:
@@ -607,12 +632,13 @@ class GismeteoApiClient:
 
     @staticmethod
     def _get_utime(source: str, tzone: int) -> datetime:
-        """Get local datetime for given datetime as string.
+        """
+        Get local datetime for given datetime as string.
 
         :raise ValueError
         """
         local_date = source
-        if len(source) <= 10:
+        if len(source) <= 10:  # noqa: PLR2004
             local_date += "T00:00:00"
         tz_h, tz_m = divmod(abs(tzone), 60)
         local_date += f"+{tz_h:02}:{tz_m:02}" if tzone >= 0 else f"-{tz_h:02}:{tz_m:02}"
@@ -624,13 +650,14 @@ class GismeteoApiClient:
         self._parsed = await self.async_get_parsed()
 
     async def async_update(self) -> bool:
-        """Get the latest data from Gismeteo.
+        """
+        Get the latest data from Gismeteo.
 
         :raise ApiError
         """
         response = await self.async_get_forecast()
         try:
-            xml = etree.fromstring(response)
+            xml = ETree.fromstring(response)
             current = xml.find("location/fact")
             current_v = current.find("values")
             tzone = int(xml.find("location").get("tzone"))
@@ -776,9 +803,8 @@ class GismeteoApiClient:
 
                 self._forecast_daily.append(data)
 
+        except (ETree.ParseError, TypeError, AttributeError) as ex:
+            msg = "Can't update weather data! Invalid server response."
+            raise ApiError(msg) from ex
+        else:
             return True
-
-        except (etree.ParseError, TypeError, AttributeError) as ex:
-            raise ApiError(
-                "Can't update weather data! Invalid server response."
-            ) from ex
