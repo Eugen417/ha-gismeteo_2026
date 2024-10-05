@@ -42,7 +42,7 @@ from homeassistant.const import (
 # Base component constants
 NAME: Final = "Gismeteo"
 DOMAIN: Final = "gismeteo"
-VERSION: Final = "3.0.2-alpha"
+VERSION: Final = "3.1.0"
 ATTRIBUTION: Final = "Data provided by Gismeteo"
 ISSUE_URL: Final = "https://github.com/Limych/ha-gismeteo/issues"
 #

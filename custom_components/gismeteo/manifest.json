@@ -17,5 +17,5 @@
         "aiofiles",
         "defusedxml"
     ],
-    "version": "3.0.2-alpha"
+    "version": "3.1.0"
 }
