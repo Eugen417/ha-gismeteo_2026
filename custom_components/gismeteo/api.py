@@ -142,12 +142,12 @@ class GismeteoApiClient:
         self._attributes = {}
 
         if location_key is not None:
-            _LOGGER.debug("Place location ID: %s", location_key)
+            _LOGGER.debug("Place location ID used")
             self._attributes = {
                 ATTR_ID: location_key,
             }
         elif self._valid_coordinates(latitude, longitude):
-            _LOGGER.debug("Place coordinates: %s, %s", latitude, longitude)
+            _LOGGER.debug("Place coordinates used")
             self._attributes = {
                 ATTR_LATITUDE: latitude,
                 ATTR_LONGITUDE: longitude,
