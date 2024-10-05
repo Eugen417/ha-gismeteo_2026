@@ -1,31 +1,33 @@
 #  Copyright (c) 2019-2024, Andrey "Limych" Khrolenok <andrey@khrolenok.ru>
 #  Creative Commons BY-NC-SA 4.0 International Public License
 #  (see LICENSE.md or https://creativecommons.org/licenses/by-nc-sa/4.0/)
-"""The Gismeteo component.
+"""
+The Gismeteo component.
 
 For more details about this platform, please refer to the documentation at
 https://github.com/Limych/ha-gismeteo/
 """
 
-from functools import cached_property
 import logging
+from functools import cached_property
 
+import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
 from aiohttp import ClientConnectorError
 from async_timeout import timeout
-import voluptuous as vol
-
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import (
     CONF_API_KEY,
+    CONF_DOMAIN,
     CONF_LATITUDE,
     CONF_LONGITUDE,
     CONF_NAME,
     CONF_SENSORS,
+    CONF_SHOW_ON_MAP,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.storage import STORAGE_DIR
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import (
@@ -38,7 +40,9 @@ from .api import ApiError, GismeteoApiClient
 from .const import (
     CONF_ADD_SENSORS,
     CONF_CACHE_DIR,
+    CONF_CACHE_TIME,
     CONF_FORECAST_DAYS,
+    CONF_TIMEZONE,
     COORDINATOR,
     DOMAIN,
     DOMAIN_YAML,
@@ -59,6 +63,7 @@ LOCATION_SCHEMA = vol.Schema(
         vol.Optional(CONF_API_KEY): cv.string,
         vol.Optional(CONF_LATITUDE): cv.latitude,
         vol.Optional(CONF_LONGITUDE): cv.longitude,
+        vol.Optional(CONF_SHOW_ON_MAP, default=False): cv.boolean,
         vol.Optional(CONF_SENSORS): cv.deprecated,
         vol.Optional(CONF_ADD_SENSORS, default=False): cv.boolean,
         vol.Optional(CONF_FORECAST_DAYS): forecast_days_int,
@@ -72,7 +77,7 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
-def deslugify(text: str):
+def deslugify(text: str) -> str:
     """Deslugify string."""
     return text.replace("_", " ").capitalize()
 
@@ -107,15 +112,18 @@ def _get_api_client(
         latitude=config.get(CONF_LATITUDE, hass.config.latitude),
         longitude=config.get(CONF_LONGITUDE, hass.config.longitude),
         params={
-            "domain": DOMAIN,
-            "timezone": str(hass.config.time_zone),
-            "cache_dir": config.get(CONF_CACHE_DIR, hass.config.path(STORAGE_DIR)),
-            "cache_time": UPDATE_INTERVAL.total_seconds(),
+            CONF_DOMAIN: DOMAIN,
+            CONF_TIMEZONE: str(hass.config.time_zone),
+            CONF_CACHE_DIR: config.get(CONF_CACHE_DIR, hass.config.path(STORAGE_DIR)),
+            CONF_CACHE_TIME: UPDATE_INTERVAL.total_seconds(),
+            CONF_SHOW_ON_MAP: config.get(CONF_SHOW_ON_MAP, False),
         },
     )
 
 
-async def _async_get_coordinator(hass: HomeAssistant, unique_id, config: dict):
+async def _async_get_coordinator(
+    hass: HomeAssistant, unique_id: str | None, config: dict
+) -> DataUpdateCoordinator:
     """Prepare update coordinator instance."""
     gismeteo = _get_api_client(hass, config)
     await gismeteo.async_update_location()
@@ -173,7 +181,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
-async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
+async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Update listener."""
     await hass.config_entries.async_reload(entry.entry_id)
 
@@ -183,7 +191,7 @@ class GismeteoDataUpdateCoordinator(DataUpdateCoordinator):
 
     def __init__(
         self, hass: HomeAssistant, unique_id: str | None, gismeteo: GismeteoApiClient
-    ):
+    ) -> None:
         """Initialize."""
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=UPDATE_INTERVAL)
 
@@ -200,7 +208,7 @@ class GismeteoDataUpdateCoordinator(DataUpdateCoordinator):
         try:
             async with timeout(10):
                 await self.gismeteo.async_update()
-            return self.gismeteo.current_data
-
         except (ApiError, ClientConnectorError) as error:
             raise UpdateFailed(error) from error
+        else:
+            return self.gismeteo.current_data

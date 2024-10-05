@@ -104,6 +104,11 @@ I put a lot of work into making this repo and component available and updated to
 >   _(float) (Optional) (Default: coordinates from the Home Assistant configuration)_\
 >   Longitude coordinate to monitor weather of (required if `latitude` is specified).
 >
+> **show_on_map:**\
+>   _(boolean) (Optional)_\
+>   Enables showing the location of the weather station on the map.\
+>   _Default value: false_
+>
 > **add_sensors:**\
 >   _(boolean) (Optional) (Default: false)_\
 >   Enable this option to add current weather and forecast sensors to the frontend.

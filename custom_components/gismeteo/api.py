@@ -49,7 +49,7 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_WIND_BEARING,
     Forecast,
 )
-from homeassistant.const import ATTR_ID, ATTR_LATITUDE, ATTR_LONGITUDE
+from homeassistant.const import ATTR_ID, ATTR_LATITUDE, ATTR_LONGITUDE, CONF_SHOW_ON_MAP
 from homeassistant.helpers.typing import StateType
 from homeassistant.util import Throttle
 from homeassistant.util import dt as dt_util
@@ -68,6 +68,8 @@ from .const import (
     ATTR_FORECAST_ROAD_CONDITION,
     ATTR_FORECAST_WATER_TEMPERATURE,
     ATTR_FORECAST_WIND_BEARING_LABEL,
+    ATTR_LAT,
+    ATTR_LON,
     ATTR_SUNRISE,
     ATTR_SUNSET,
     CONDITION_FOG_CLASSES,
@@ -139,6 +141,9 @@ class GismeteoApiClient:
 
         self._session = session
         self._cache = Cache(params) if params.get("cache_dir") is not None else None
+        self._latitude = latitude
+        self._longitude = longitude
+        self._show_on_map = params.get(CONF_SHOW_ON_MAP, False)
         self._attributes = {}
 
         if location_key is not None:
@@ -148,10 +153,7 @@ class GismeteoApiClient:
             }
         elif self._valid_coordinates(latitude, longitude):
             _LOGGER.debug("Place coordinates used")
-            self._attributes = {
-                ATTR_LATITUDE: latitude,
-                ATTR_LONGITUDE: longitude,
-            }
+
         else:
             raise InvalidCoordinatesError
 
@@ -179,7 +181,15 @@ class GismeteoApiClient:
     @property
     def attributes(self) -> dict[str, Any] | None:
         """Return an attributes."""
-        return self._attributes
+        attrs = self._attributes.copy()  # type: dict[str, Any]
+        if self._show_on_map:
+            attrs[ATTR_LATITUDE] = self._latitude
+            attrs[ATTR_LONGITUDE] = self._longitude
+        else:
+            attrs[ATTR_LAT] = self._latitude
+            attrs[ATTR_LON] = self._longitude
+
+        return attrs
 
     @property
     def current_data(self) -> dict[str, Any]:
@@ -245,30 +255,22 @@ class GismeteoApiClient:
 
     async def async_update_location(self) -> None:
         """Retreive location data from Gismeteo."""
-        if (
-            self._attributes[ATTR_LATITUDE] == 0
-            and self._attributes[ATTR_LONGITUDE] == 0
-        ):
+        if self._latitude == 0 and self._longitude == 0:
             return
 
         url = (
-            ENDPOINT_URL + f"/cities/?lat={self._attributes[ATTR_LATITUDE]}"
-            f"&lng={self._attributes[ATTR_LONGITUDE]}&count=1&lang=en"
+            ENDPOINT_URL + f"/cities/?lat={self._latitude}"
+            f"&lng={self._longitude}&count=1&lang=en"
         )
-        cache_fname = (
-            f"location_{self._attributes[ATTR_LATITUDE]}"
-            f"_{self._attributes[ATTR_LONGITUDE]}"
-        )
+        cache_fname = f"location_{self._latitude}_{self._longitude}"
 
         response = await self._async_get_data(url, cache_fname)
         try:
             xml = ETree.fromstring(response)
             item = xml.find("item")
-            self._attributes = {
-                ATTR_ID: self._get(item, "id", int),
-                ATTR_LATITUDE: self._get(item, "lat", float),
-                ATTR_LONGITUDE: self._get(item, "lng", float),
-            }
+            self._attributes[ATTR_ID] = self._get(item, "id", int)
+            self._latitude = self._get(item, "lat", float)
+            self._longitude = self._get(item, "lng", float)
 
         except (ETree.ParseError, TypeError, AttributeError) as ex:
             msg = "Can't retrieve location data! Invalid server response."

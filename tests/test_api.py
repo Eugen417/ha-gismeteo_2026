@@ -5,25 +5,8 @@ from http import HTTPStatus
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
-from aiohttp import ClientSession
 import pytest
-from pytest import raises
-from pytest_homeassistant_custom_component.common import load_fixture
-
-from custom_components.gismeteo.api import (
-    ApiError,
-    GismeteoApiClient,
-    InvalidCoordinatesError,
-)
-from custom_components.gismeteo.const import (
-    ATTR_FORECAST_IS_STORM,
-    ATTR_FORECAST_PHENOMENON,
-    ATTR_FORECAST_PRECIPITATION_INTENSITY,
-    ATTR_FORECAST_PRECIPITATION_TYPE,
-    ATTR_SUNRISE,
-    CONDITION_FOG_CLASSES,
-    ForecastMode,
-)
+from aiohttp import ClientSession
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
@@ -44,6 +27,24 @@ from homeassistant.components.weather import (
 )
 from homeassistant.const import ATTR_ID
 from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import load_fixture
+
+from custom_components.gismeteo.api import (
+    ApiError,
+    GismeteoApiClient,
+    InvalidCoordinatesError,
+)
+from custom_components.gismeteo.const import (
+    ATTR_FORECAST_IS_STORM,
+    ATTR_FORECAST_PHENOMENON,
+    ATTR_FORECAST_PRECIPITATION_INTENSITY,
+    ATTR_FORECAST_PRECIPITATION_TYPE,
+    ATTR_LAT,
+    ATTR_LON,
+    ATTR_SUNRISE,
+    CONDITION_FOG_CLASSES,
+    ForecastMode,
+)
 
 LATITUDE = 52.0677904
 LONGITUDE = 19.4795644
@@ -54,7 +55,7 @@ TZ180 = dt_util.get_time_zone("Europe/Moscow")
 
 
 @pytest.fixture(autouse=True)
-def patch_time():
+def _patch_time() -> None:
     """Patch time functions."""
     with (
         patch.object(dt_util, "now", return_value=MOCK_NOW),
@@ -82,7 +83,7 @@ async def test__valid_coordinates():
             assert GismeteoApiClient._valid_coordinates(lat, lon) is False
 
     async with ClientSession() as client:
-        with raises(InvalidCoordinatesError):
+        with pytest.raises(InvalidCoordinatesError):
             GismeteoApiClient(client, latitude=lat_invalid[0], longitude=lon_invalid[0])
 
 
@@ -114,7 +115,7 @@ async def test__async_get_data(mock_get):
     #
     async with ClientSession() as client:
         gismeteo = GismeteoApiClient(client, latitude=LATITUDE, longitude=LONGITUDE)
-        with raises(ApiError):
+        with pytest.raises(ApiError):
             await gismeteo._async_get_data("some_url")
 
 
@@ -155,7 +156,7 @@ async def test_async_update_location():
     ):
         async with ClientSession() as client:
             gismeteo = GismeteoApiClient(client, latitude=LATITUDE, longitude=LONGITUDE)
-            with raises(ApiError):
+            with pytest.raises(ApiError):
                 await gismeteo.async_update_location()
 
     with patch.object(
@@ -165,7 +166,7 @@ async def test_async_update_location():
     ):
         async with ClientSession() as client:
             gismeteo = GismeteoApiClient(client, latitude=LATITUDE, longitude=LONGITUDE)
-            with raises(ApiError):
+            with pytest.raises(ApiError):
                 await gismeteo.async_update_location()
 
 
@@ -184,7 +185,7 @@ def test__get_utime():
         2021, 2, 21, tzinfo=dt_util.UTC
     )
 
-    with raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         GismeteoApiClient._get_utime("2021-02-", 0)
 
 
@@ -226,150 +227,150 @@ async def test_async_get_parsed(gismeteo_api):
             datetime(2021, 2, 21, tzinfo=TZ180): {
                 "geomagnetic": "7",
                 "humidity": "61",
-                "icon-snow": "–",
+                "icon-snow": "–",  # noqa: RUF001
                 "icon-tooltip": None,
                 "pollen-birch": "2",
-                "pollen-grass": "–",
-                "pollen-ragweed": "–",
+                "pollen-grass": "–",  # noqa: RUF001
+                "pollen-ragweed": "–",  # noqa: RUF001
                 "precipitation-bars": "0,3",
                 "radiation": "2",
                 "roadcondition": "Сухая дорога",
-                "wind-direction": "С",
-                "wind-gust": "–",
+                "wind-direction": "С",  # noqa: RUF001
+                "wind-gust": "–",  # noqa: RUF001
                 "wind-speed": "2",
             },
             datetime(2021, 2, 22, tzinfo=TZ180): {
                 "geomagnetic": "6",
                 "humidity": "51",
-                "icon-snow": "–",
+                "icon-snow": "–",  # noqa: RUF001
                 "icon-tooltip": None,
                 "pollen-birch": "2",
-                "pollen-grass": "–",
-                "pollen-ragweed": "–",
+                "pollen-grass": "–",  # noqa: RUF001
+                "pollen-ragweed": "–",  # noqa: RUF001
                 "precipitation-bars": "0",
                 "radiation": "4",
                 "roadcondition": "Сухая дорога",
-                "wind-direction": "С",
+                "wind-direction": "С",  # noqa: RUF001
                 "wind-gust": "4",
                 "wind-speed": "1",
             },
             datetime(2021, 2, 23, tzinfo=TZ180): {
                 "geomagnetic": "4",
                 "humidity": "51",
-                "icon-snow": "–",
+                "icon-snow": "–",  # noqa: RUF001
                 "icon-tooltip": None,
                 "pollen-birch": "2",
-                "pollen-grass": "–",
-                "pollen-ragweed": "–",
+                "pollen-grass": "–",  # noqa: RUF001
+                "pollen-ragweed": "–",  # noqa: RUF001
                 "precipitation-bars": "0",
                 "radiation": "3",
                 "roadcondition": "Сухая дорога",
-                "wind-direction": "СЗ",
+                "wind-direction": "СЗ",  # noqa: RUF001
                 "wind-gust": "4",
                 "wind-speed": "1",
             },
             datetime(2021, 2, 24, tzinfo=TZ180): {
                 "geomagnetic": "2",
                 "humidity": "48",
-                "icon-snow": "–",
+                "icon-snow": "–",  # noqa: RUF001
                 "icon-tooltip": None,
                 "pollen-birch": "1",
-                "pollen-grass": "–",
-                "pollen-ragweed": "–",
+                "pollen-grass": "–",  # noqa: RUF001
+                "pollen-ragweed": "–",  # noqa: RUF001
                 "precipitation-bars": "0",
                 "radiation": "5",
                 "roadcondition": "Сухая дорога",
-                "wind-direction": "СЗ",
+                "wind-direction": "СЗ",  # noqa: RUF001
                 "wind-gust": "4",
                 "wind-speed": "1",
             },
             datetime(2021, 2, 25, tzinfo=TZ180): {
                 "geomagnetic": "2",
                 "humidity": "48",
-                "icon-snow": "–",
+                "icon-snow": "–",  # noqa: RUF001
                 "icon-tooltip": None,
                 "pollen-birch": "1",
-                "pollen-grass": "–",
-                "pollen-ragweed": "–",
+                "pollen-grass": "–",  # noqa: RUF001
+                "pollen-ragweed": "–",  # noqa: RUF001
                 "precipitation-bars": "0",
                 "radiation": "7",
                 "roadcondition": "Нет данных",
-                "wind-direction": "СЗ",
+                "wind-direction": "СЗ",  # noqa: RUF001
                 "wind-gust": "4",
                 "wind-speed": "1",
             },
             datetime(2021, 2, 26, tzinfo=TZ180): {
                 "geomagnetic": "2",
                 "humidity": "65",
-                "icon-snow": "–",
+                "icon-snow": "–",  # noqa: RUF001
                 "icon-tooltip": None,
                 "pollen-birch": "3",
-                "pollen-grass": "–",
-                "pollen-ragweed": "–",
+                "pollen-grass": "–",  # noqa: RUF001
+                "pollen-ragweed": "–",  # noqa: RUF001
                 "precipitation-bars": "5,9",
                 "radiation": "1",
                 "roadcondition": "Нет данных",
-                "wind-direction": "С",
+                "wind-direction": "С",  # noqa: RUF001
                 "wind-gust": "4",
                 "wind-speed": "1",
             },
             datetime(2021, 2, 27, tzinfo=TZ180): {
                 "geomagnetic": "2",
                 "humidity": "66",
-                "icon-snow": "–",
+                "icon-snow": "–",  # noqa: RUF001
                 "icon-tooltip": None,
                 "pollen-birch": "2",
-                "pollen-grass": "–",
-                "pollen-ragweed": "–",
+                "pollen-grass": "–",  # noqa: RUF001
+                "pollen-ragweed": "–",  # noqa: RUF001
                 "precipitation-bars": "0",
                 "radiation": "7",
                 "roadcondition": "Нет данных",
-                "wind-direction": "С",
+                "wind-direction": "С",  # noqa: RUF001
                 "wind-gust": "6",
                 "wind-speed": "2",
             },
             datetime(2021, 2, 28, tzinfo=TZ180): {
                 "geomagnetic": "2",
                 "humidity": "56",
-                "icon-snow": "–",
+                "icon-snow": "–",  # noqa: RUF001
                 "icon-tooltip": None,
                 "pollen-birch": "0",
-                "pollen-grass": "–",
-                "pollen-ragweed": "–",
+                "pollen-grass": "–",  # noqa: RUF001
+                "pollen-ragweed": "–",  # noqa: RUF001
                 "precipitation-bars": "0",
                 "radiation": "7",
                 "roadcondition": "Нет данных",
-                "wind-direction": "СЗ",
+                "wind-direction": "СЗ",  # noqa: RUF001
                 "wind-gust": "3",
                 "wind-speed": "1",
             },
             datetime(2021, 3, 1, tzinfo=TZ180): {
                 "geomagnetic": "2",
                 "humidity": "55",
-                "icon-snow": "–",
+                "icon-snow": "–",  # noqa: RUF001
                 "icon-tooltip": None,
-                "pollen-birch": "–",
-                "pollen-grass": "–",
-                "pollen-ragweed": "–",
+                "pollen-birch": "–",  # noqa: RUF001
+                "pollen-grass": "–",  # noqa: RUF001
+                "pollen-ragweed": "–",  # noqa: RUF001
                 "precipitation-bars": "0",
                 "radiation": "6",
                 "roadcondition": "Нет данных",
-                "wind-direction": "СЗ",
+                "wind-direction": "СЗ",  # noqa: RUF001
                 "wind-gust": "4",
                 "wind-speed": "2",
             },
             datetime(2021, 3, 2, tzinfo=TZ180): {
                 "geomagnetic": "2",
                 "humidity": "54",
-                "icon-snow": "–",
+                "icon-snow": "–",  # noqa: RUF001
                 "icon-tooltip": None,
-                "pollen-birch": "–",
-                "pollen-grass": "–",
-                "pollen-ragweed": "–",
+                "pollen-birch": "–",  # noqa: RUF001
+                "pollen-grass": "–",  # noqa: RUF001
+                "pollen-ragweed": "–",  # noqa: RUF001
                 "precipitation-bars": "0",
                 "radiation": "6",
                 "roadcondition": "Нет данных",
-                "wind-direction": "З",
+                "wind-direction": "З",  # noqa: RUF001
                 "wind-gust": "5",
                 "wind-speed": "2",
             },
@@ -380,14 +381,14 @@ async def test_async_get_parsed(gismeteo_api):
 
 async def init_gismeteo(
     location_key: int | None = LOCATION_KEY,
-    data: Any = False,
+    data: Any = False,  # noqa: FBT002
 ):
     """Prepare Gismeteo object."""
     forecast_data = data if data is not False else load_fixture("forecast.xml")
     forecast_parsed_data = load_fixture("forecast_parsed.html")
 
     # pylint: disable=unused-argument
-    def mock_data(*args, **kwargs):
+    def mock_data(*args, **kwargs) -> str:  # noqa: ANN002, ANN003
         return (
             forecast_data if args[0].find("/forecast/") >= 0 else forecast_parsed_data
         )
@@ -466,7 +467,11 @@ async def test_api_init():
         "road_condition": "Сухая дорога",
     }
 
-    assert gismeteo.attributes == {"id": LOCATION_KEY}
+    assert gismeteo.attributes == {
+        ATTR_ID: LOCATION_KEY,
+        ATTR_LAT: LATITUDE,
+        ATTR_LON: LONGITUDE,
+    }
     assert gismeteo.current_data == expected_current
     assert gismeteo.forecast_data(0) == expected_forecast
 
@@ -479,15 +484,15 @@ async def test_async_update():
     assert gismeteo.current_data[ATTR_FORECAST_HUMIDITY] == 86
     assert gismeteo.current_data[ATTR_FORECAST_PHENOMENON] == 71
 
-    with raises(ApiError):
+    with pytest.raises(ApiError):
         await init_gismeteo(location_key=None)
-    with raises(ApiError):
+    with pytest.raises(ApiError):
         await init_gismeteo(data=None)
-    with raises(ApiError):
+    with pytest.raises(ApiError):
         await init_gismeteo(data="qwe")
 
 
-async def test_condition():
+async def test_condition():  # noqa: PLR0915
     """Test condition."""
     gismeteo = await init_gismeteo()
 
@@ -831,38 +836,3 @@ async def test_road_condition():
             gismeteo_d.road_condition(gismeteo_d.forecast_data(day, ForecastMode.DAILY))
             == exp
         )
-
-
-#
-# async def test_forecast():
-#     """Test forecast."""
-#     with patch(
-#         "homeassistant.util.dt.now",
-#         return_value=datetime(2021, 2, 26, tzinfo=dt_util.UTC),
-#     ):
-#         gismeteo_d = await init_gismeteo()
-#
-#         assert gismeteo_d.forecast(ForecastMode.DAILY) == [
-#             {
-#                 "datetime": datetime(2021, 2, 26, tzinfo=TZ180),
-#                 "condition": "rainy",
-#                 "temperature": 4.0,
-#                 "pressure": 0.0,
-#                 "humidity": 89,
-#                 "wind_speed": 7,
-#                 "wind_bearing": 270,
-#                 "precipitation": 0.3,
-#                 "templow": 2,
-#             },
-#             {
-#                 "datetime": datetime(2021, 2, 27, tzinfo=TZ180),
-#                 "condition": "cloudy",
-#                 "temperature": 2.0,
-#                 "pressure": 0.0,
-#                 "humidity": 87,
-#                 "wind_speed": 6,
-#                 "wind_bearing": 270,
-#                 "precipitation": 0.0,
-#                 "templow": 0,
-#             },
-#         ]

@@ -4,12 +4,12 @@
 from unittest.mock import patch
 
 import pytest
+from homeassistant import config_entries, data_entry_flow
+from homeassistant.const import CONF_NAME, CONF_SHOW_ON_MAP
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.gismeteo.const import CONF_ADD_SENSORS, DOMAIN
-from homeassistant import config_entries, data_entry_flow
-from homeassistant.const import CONF_NAME
-from homeassistant.core import HomeAssistant
 
 from .const import TEST_CONFIG
 
@@ -18,7 +18,7 @@ from .const import TEST_CONFIG
 # since we only want to test the config flow. We test the
 # actual functionality of the integration in other test modules.
 @pytest.fixture(autouse=True)
-def bypass_setup_fixture():
+def _bypass_setup_fixture() -> None:
     """Prevent setup."""
     with (
         patch(
@@ -110,6 +110,7 @@ async def test_options_flow(hass: HomeAssistant):
     # Verify that the options were updated
     assert entry.options == {
         CONF_ADD_SENSORS: False,
+        CONF_SHOW_ON_MAP: False,
     }
 
 

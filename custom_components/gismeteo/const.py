@@ -1,7 +1,8 @@
 #  Copyright (c) 2019-2024, Andrey "Limych" Khrolenok <andrey@khrolenok.ru>
 #  Creative Commons BY-NC-SA 4.0 International Public License
 #  (see LICENSE.md or https://creativecommons.org/licenses/by-nc-sa/4.0/)
-"""The Gismeteo component.
+"""
+The Gismeteo component.
 
 For more details about this platform, please refer to the documentation at
 https://github.com/Limych/ha-gismeteo/
@@ -61,7 +62,9 @@ If you have ANY issues with this you need to open an issue here:
 PLATFORMS: Final = [Platform.SENSOR, Platform.WEATHER]
 
 # Configuration and options
+CONF_TIMEZONE: Final = "timezone"
 CONF_CACHE_DIR: Final = "cache_dir"
+CONF_CACHE_TIME: Final = "cache_time"
 CONF_ADD_SENSORS: Final = "add_sensors"
 CONF_FORECAST_DAYS: Final = "forecast_days"
 
@@ -87,6 +90,9 @@ ATTR_FORECAST_UV_INDEX = "uv_index"
 ATTR_FORECAST_ROAD_CONDITION: Final = "road_condition"
 ATTR_FORECAST_RAIN_AMOUNT: Final = "rain_amount"
 ATTR_FORECAST_SNOW_AMOUNT: Final = "snow_amount"
+#
+ATTR_LAT = "lat"
+ATTR_LON = "lon"
 
 COORDINATOR: Final = "coordinator"
 UNDO_UPDATE_LISTENER: Final = "undo_update_listener"
@@ -95,7 +101,8 @@ ENDPOINT_URL: Final = "https://services.gismeteo.ru/inform-service/inf_chrome"
 #
 PARSER_URL_FORMAT: Final = "https://www.gismeteo.ru/weather-{}/10-days/"
 PARSER_USER_AGENT: Final = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36 Edg/88.0.705.81"
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
+    " Chrome/128.0.0.0 Safari/537.36"
 )
 
 UPDATE_INTERVAL: Final = timedelta(minutes=5)

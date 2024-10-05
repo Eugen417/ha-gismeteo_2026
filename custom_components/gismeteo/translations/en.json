@@ -227,6 +227,7 @@
         "step": {
             "user": {
                 "data": {
+                    "show_on_map": "Show entities on map",
                     "add_sensors": "Sensor entities enabled",
                     "forecast_days": "Forecast sensors to show (days)"
                 },
