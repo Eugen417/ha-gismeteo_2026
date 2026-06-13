@@ -123,7 +123,6 @@ class GismeteoOptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize HACS options flow."""
-        # ИСПРАВЛЕНИЕ: Удалена строка self.config_entry = config_entry, вызывавшая краш!
         self.options = dict(config_entry.options)
 
     async def async_step_init(
@@ -149,33 +148,27 @@ class GismeteoOptionsFlowHandler(config_entries.OptionsFlow):
             
             return self.async_create_entry(title=title, data=self.options)
 
-        # Вытаскиваем текущие значения (сначала ищем в измененных опциях, если нет - берем из начальной даты)
-        current_name = self.config_entry.options.get(CONF_NAME, self.config_entry.data.get(CONF_NAME, ""))
-        current_lat = self.config_entry.options.get(CONF_LATITUDE, self.config_entry.data.get(CONF_LATITUDE, self.hass.config.latitude))
-        current_lon = self.config_entry.options.get(CONF_LONGITUDE, self.config_entry.data.get(CONF_LONGITUDE, self.hass.config.longitude))
+        # Собираем все текущие значения в один словарь для предзаполнения полей
+        suggested_values = {**self.config_entry.data, **self.options}
+        
+        # Если каких-то чекбоксов еще нет в настройках (например, при первой настройке), ставим им False
+        suggested_values.setdefault(CONF_SHOW_ON_MAP, False)
+        suggested_values.setdefault(CONF_ADD_SENSORS, False)
 
         return self.async_show_form(
             step_id="user",
             data_schema=self.add_suggested_values_to_schema(
                 vol.Schema(
                     {
-                        vol.Required(CONF_NAME, default=current_name): str,
-                        vol.Required(CONF_LATITUDE, default=current_lat): cv.latitude,
-                        vol.Required(CONF_LONGITUDE, default=current_lon): cv.longitude,
-                        vol.Required(
-                            CONF_SHOW_ON_MAP,
-                            default=self.config_entry.options.get(CONF_SHOW_ON_MAP, False),
-                        ): bool,
-                        vol.Required(
-                            CONF_ADD_SENSORS, 
-                            default=self.config_entry.options.get(CONF_ADD_SENSORS, False)
-                        ): bool,
-                        vol.Optional(
-                            CONF_FORECAST_DAYS,
-                            default=self.config_entry.options.get(CONF_FORECAST_DAYS)
-                        ): forecast_days_int,
+                        vol.Required(CONF_NAME): str,
+                        vol.Required(CONF_LATITUDE): cv.latitude,
+                        vol.Required(CONF_LONGITUDE): cv.longitude,
+                        vol.Required(CONF_SHOW_ON_MAP): bool,
+                        vol.Required(CONF_ADD_SENSORS): bool,
+                        # Убрали жесткий default=..., чтобы не ломать логику 0 дней или пустых значений
+                        vol.Optional(CONF_FORECAST_DAYS): forecast_days_int,
                     }
                 ),
-                self.config_entry.options,
+                suggested_values,
             ),
         )
