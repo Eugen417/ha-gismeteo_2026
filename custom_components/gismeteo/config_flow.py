@@ -123,6 +123,7 @@ class GismeteoOptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
+        self.config_entry = config_entry
         self.options = dict(config_entry.options)
 
     async def async_step_init(
@@ -144,22 +145,36 @@ class GismeteoOptionsFlowHandler(config_entries.OptionsFlow):
                 options[CONF_FORECAST_DAYS] = None
             options.update(user_input)
             
-            # Защита от отсутствующего значения имени, возвращаем пустую строку как fallback
-            title = self.config_entry.data.get(CONF_NAME, "")
+            # Обновляем заголовок интеграции, если пользователь изменил имя
+            title = user_input.get(CONF_NAME, self.config_entry.data.get(CONF_NAME, ""))
             
             return self.async_create_entry(title=title, data=options)
+
+        # Вытаскиваем текущие значения (сначала ищем в измененных опциях, если нет - берем из начальной даты)
+        current_name = self.config_entry.options.get(CONF_NAME, self.config_entry.data.get(CONF_NAME, ""))
+        current_lat = self.config_entry.options.get(CONF_LATITUDE, self.config_entry.data.get(CONF_LATITUDE, self.hass.config.latitude))
+        current_lon = self.config_entry.options.get(CONF_LONGITUDE, self.config_entry.data.get(CONF_LONGITUDE, self.hass.config.longitude))
 
         return self.async_show_form(
             step_id="user",
             data_schema=self.add_suggested_values_to_schema(
                 vol.Schema(
                     {
+                        vol.Required(CONF_NAME, default=current_name): str,
+                        vol.Required(CONF_LATITUDE, default=current_lat): cv.latitude,
+                        vol.Required(CONF_LONGITUDE, default=current_lon): cv.longitude,
                         vol.Required(
                             CONF_SHOW_ON_MAP,
                             default=self.config_entry.options.get(CONF_SHOW_ON_MAP, False),
                         ): bool,
-                        vol.Required(CONF_ADD_SENSORS, default=False): bool,
-                        vol.Optional(CONF_FORECAST_DAYS): forecast_days_int,
+                        vol.Required(
+                            CONF_ADD_SENSORS, 
+                            default=self.config_entry.options.get(CONF_ADD_SENSORS, False)
+                        ): bool,
+                        vol.Optional(
+                            CONF_FORECAST_DAYS,
+                            default=self.config_entry.options.get(CONF_FORECAST_DAYS)
+                        ): forecast_days_int,
                     }
                 ),
                 self.config_entry.options,
