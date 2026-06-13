@@ -534,7 +534,7 @@ class GismeteoApiClient:
         storm = src.get(ATTR_FORECAST_IS_STORM)
         if storm is None:
             return None
-        return "on" if storm else "off"
+        return "yes" if storm else "no"
 
     def geomagnetic_field(self, src: dict | None = None) -> int | None:
         """Return geomagnetic field index."""
@@ -762,7 +762,7 @@ class GismeteoApiClient:
             for day in xml.findall("location/day[@descr]"):
                 tstamp = self._get_utime(day.get("date"), tzone)
                 
-                # --- ИСПРАВЛЕНИЕ: Вычисляем среднее давление за день из почасового прогноза XML ---
+                # --- Вычисляем среднее давление за день из почасового прогноза ---
                 daily_p = [
                     h_fc.get(ATTR_FORECAST_NATIVE_PRESSURE)
                     for h_fc in self._forecast_hourly
@@ -770,7 +770,7 @@ class GismeteoApiClient:
                     and h_fc.get(ATTR_FORECAST_NATIVE_PRESSURE) is not None
                 ]
                 calc_pressure = int(sum(daily_p) / len(daily_p)) if daily_p else None
-                # ----------------------------------------------------------------------------------
+                # -----------------------------------------------------------------
 
                 data = {
                     ATTR_SUNRISE: sunrise,
@@ -779,7 +779,7 @@ class GismeteoApiClient:
                     ATTR_FORECAST_CONDITION: self._get(day, "descr"),
                     ATTR_FORECAST_NATIVE_TEMP: self._get(day, "tmax", int),
                     ATTR_FORECAST_NATIVE_TEMP_LOW: self._get(day, "tmin", int),
-                    ATTR_FORECAST_NATIVE_PRESSURE: calc_pressure,  # <-- Теперь тут реальные цифры
+                    ATTR_FORECAST_NATIVE_PRESSURE: calc_pressure,
                     ATTR_FORECAST_HUMIDITY: self._get(day, "hum", int),
                     ATTR_FORECAST_NATIVE_WIND_SPEED: self._get(day, "ws", int),
                     ATTR_FORECAST_WIND_BEARING: self._get(day, "wd", int),
@@ -813,6 +813,9 @@ class GismeteoApiClient:
                             ),
                         }
                     )
+                    
+                    if not data.get(ATTR_FORECAST_NATIVE_PRESSURE):
+                        data[ATTR_FORECAST_NATIVE_PRESSURE] = self._get(parsed, "pressure", int)
 
                 self._forecast_daily.append(data)
 
