@@ -804,6 +804,10 @@ class GismeteoApiClient:
                             ),
                         }
                     )
+                    
+                    # НОВЫЙ КОД: Если XML API не отдал прогноз давления, парсим его прямо со страницы
+                    if not data.get(ATTR_FORECAST_NATIVE_PRESSURE):
+                        data[ATTR_FORECAST_NATIVE_PRESSURE] = self._get(parsed, "pressure", int)
 
                 self._forecast_daily.append(data)
 
