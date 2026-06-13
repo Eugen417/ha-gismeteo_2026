@@ -122,8 +122,7 @@ class GismeteoOptionsFlowHandler(config_entries.OptionsFlow):
     """Gismeteo config flow options handler."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize HACS options flow."""
-        self.config_entry = config_entry
+        """Initialize options flow."""
         self.options = dict(config_entry.options)
 
     async def async_step_init(
@@ -140,10 +139,15 @@ class GismeteoOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         """Handle a flow initialized by the user."""
         if user_input is not None:
-            if CONF_FORECAST_DAYS in self.options:
-                self.options[CONF_FORECAST_DAYS] = None
-            self.options.update(user_input)
-            return await self._update_options()
+            options = dict(self.config_entry.options)
+            if CONF_FORECAST_DAYS in options:
+                options[CONF_FORECAST_DAYS] = None
+            options.update(user_input)
+            
+            # Защита от отсутствующего значения имени, возвращаем пустую строку как fallback
+            title = self.config_entry.data.get(CONF_NAME, "")
+            
+            return self.async_create_entry(title=title, data=options)
 
         return self.async_show_form(
             step_id="user",
@@ -152,7 +156,7 @@ class GismeteoOptionsFlowHandler(config_entries.OptionsFlow):
                     {
                         vol.Required(
                             CONF_SHOW_ON_MAP,
-                            default=self.options.get(CONF_SHOW_ON_MAP, False),
+                            default=self.config_entry.options.get(CONF_SHOW_ON_MAP, False),
                         ): bool,
                         vol.Required(CONF_ADD_SENSORS, default=False): bool,
                         vol.Optional(CONF_FORECAST_DAYS): forecast_days_int,
@@ -160,10 +164,4 @@ class GismeteoOptionsFlowHandler(config_entries.OptionsFlow):
                 ),
                 self.config_entry.options,
             ),
-        )
-
-    async def _update_options(self) -> config_entries.ConfigFlowResult:
-        """Update config entry options."""
-        return self.async_create_entry(
-            title=self.config_entry.data.get(CONF_NAME), data=self.options
         )
