@@ -122,8 +122,8 @@ class GismeteoOptionsFlowHandler(config_entries.OptionsFlow):
     """Gismeteo config flow options handler."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
+        """Initialize HACS options flow."""
+        # ИСПРАВЛЕНИЕ: Удалена строка self.config_entry = config_entry, вызывавшая краш!
         self.options = dict(config_entry.options)
 
     async def async_step_init(
@@ -140,15 +140,14 @@ class GismeteoOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         """Handle a flow initialized by the user."""
         if user_input is not None:
-            options = dict(self.config_entry.options)
-            if CONF_FORECAST_DAYS in options:
-                options[CONF_FORECAST_DAYS] = None
-            options.update(user_input)
+            if CONF_FORECAST_DAYS in self.options:
+                self.options[CONF_FORECAST_DAYS] = None
+            self.options.update(user_input)
             
             # Обновляем заголовок интеграции, если пользователь изменил имя
             title = user_input.get(CONF_NAME, self.config_entry.data.get(CONF_NAME, ""))
             
-            return self.async_create_entry(title=title, data=options)
+            return self.async_create_entry(title=title, data=self.options)
 
         # Вытаскиваем текущие значения (сначала ищем в измененных опциях, если нет - берем из начальной даты)
         current_name = self.config_entry.options.get(CONF_NAME, self.config_entry.data.get(CONF_NAME, ""))
