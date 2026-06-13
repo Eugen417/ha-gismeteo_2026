@@ -67,8 +67,8 @@
         "is_storm": {
           "name": "Storm",
           "state": {
-            "false": "False",
-            "true": "True"
+            "no": "No",
+            "yes": "Yes"
           }
         },
         "geomagnetic_field": {
@@ -170,8 +170,8 @@
         "is_storm_forecast": {
           "name": "Storm Forecast {day}d",
           "state": {
-            "false": "False",
-            "true": "True"
+            "no": "No",
+            "yes": "Yes"
           }
         },
         "geomagnetic_field_forecast": {
