@@ -308,13 +308,15 @@ class GismeteoApiClient:
         parser = BeautifulSoup(response, "html.parser")
 
         try:
-            for row in parser.find_all("div", {"class": "widget-row"}):
-                if "data-row" not in row.attrs:
-                    continue
-                metric = row["data-row"]
-                for day, row_data in enumerate(
-                    row.find_all("div", {"class": "row-item"})
-                ):
+            # Отвязываемся от жесткого класса "widget-row", ищем просто по наличию атрибута data-row
+            for row in parser.find_all(attrs={"data-row": True}):
+                metric = row.get("data-row")
+                
+                # Отвязываемся от точного класса "row-item". 
+                # Ищем любые дочерние div, где в названии класса встречается слово 'item'
+                items = row.find_all("div", class_=lambda c: c and "item" in str(c))
+                
+                for day, row_data in enumerate(items):
                     ts = today + timedelta(days=day)
                     data.setdefault(ts, {})
                     data[ts][metric] = next(row_data.stripped_strings, None)
