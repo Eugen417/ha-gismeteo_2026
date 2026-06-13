@@ -23,8 +23,7 @@ This component can be used in two different ways: as a weather provider and as a
 I also suggest you [visit the support topic][forum] on the community forum.
 
 ## Installation
-
-[![Open your Home Assistant instance and open a repository window in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Eugen417&repository=HA_xras_space_weather&category=Integration)
+[![Open your Home Assistant instance and open a repository window in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Eugen417&repository=ha-gismeteo_2026&category=Integration)
 
 ### Install from HACS (recommended)
 
