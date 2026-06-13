@@ -816,8 +816,19 @@ class GismeteoApiClient:
                     
                     if not data.get(ATTR_FORECAST_NATIVE_PRESSURE):
                         data[ATTR_FORECAST_NATIVE_PRESSURE] = self._get(parsed, "pressure", int)
+                        
+                    # НОВЫЙ КОД: Подстраховка для геомагнитного фона (вытягиваем из HTML)
+                    if not data.get(ATTR_FORECAST_GEOMAGNETIC_FIELD):
+                        data[ATTR_FORECAST_GEOMAGNETIC_FIELD] = self._get(parsed, "gm", int) or self._get(parsed, "geomagnetic", int)
 
                 self._forecast_daily.append(data)
+
+            # НОВЫЙ КОД: Лечим текущий датчик геомагнитного фона.
+            # Если старый XML отдал 0 или ничего для текущего времени, берем реальное значение из прогноза на сегодня.
+            if self._forecast_daily:
+                today_gm = self._forecast_daily[0].get(ATTR_FORECAST_GEOMAGNETIC_FIELD)
+                if today_gm and not self._current.get(ATTR_FORECAST_GEOMAGNETIC_FIELD):
+                    self._current[ATTR_FORECAST_GEOMAGNETIC_FIELD] = today_gm
 
         except (ETree.ParseError, TypeError, AttributeError) as ex:
             msg = "Can't update weather data! Invalid server response."
