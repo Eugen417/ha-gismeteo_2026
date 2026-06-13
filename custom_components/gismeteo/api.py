@@ -308,14 +308,9 @@ class GismeteoApiClient:
         parser = BeautifulSoup(response, "html.parser")
 
         try:
-            # Отвязываемся от жесткого класса "widget-row", ищем просто по наличию атрибута data-row
             for row in parser.find_all(attrs={"data-row": True}):
                 metric = row.get("data-row")
-                
-                # Отвязываемся от точного класса "row-item". 
-                # Ищем любые дочерние div, где в названии класса встречается слово 'item'
                 items = row.find_all("div", class_=lambda c: c and "item" in str(c))
-                
                 for day, row_data in enumerate(items):
                     ts = today + timedelta(days=day)
                     data.setdefault(ts, {})
@@ -533,10 +528,13 @@ class GismeteoApiClient:
             else 0
         )
 
-    def is_storm(self, src: dict | None = None) -> bool | None:
-        """Return True if storm."""
+    def is_storm(self, src: dict | None = None) -> str | None:
+        """Return text state if storm."""
         src = src or self._current
-        return src.get(ATTR_FORECAST_IS_STORM)
+        storm = src.get(ATTR_FORECAST_IS_STORM)
+        if storm is None:
+            return None
+        return "on" if storm else "off"
 
     def geomagnetic_field(self, src: dict | None = None) -> int | None:
         """Return geomagnetic field index."""
@@ -763,6 +761,17 @@ class GismeteoApiClient:
             self._forecast_daily = []
             for day in xml.findall("location/day[@descr]"):
                 tstamp = self._get_utime(day.get("date"), tzone)
+                
+                # --- ИСПРАВЛЕНИЕ: Вычисляем среднее давление за день из почасового прогноза XML ---
+                daily_p = [
+                    h_fc.get(ATTR_FORECAST_NATIVE_PRESSURE)
+                    for h_fc in self._forecast_hourly
+                    if h_fc.get(ATTR_FORECAST_TIME) and h_fc.get(ATTR_FORECAST_TIME).date() == tstamp.date() 
+                    and h_fc.get(ATTR_FORECAST_NATIVE_PRESSURE) is not None
+                ]
+                calc_pressure = int(sum(daily_p) / len(daily_p)) if daily_p else None
+                # ----------------------------------------------------------------------------------
+
                 data = {
                     ATTR_SUNRISE: sunrise,
                     ATTR_SUNSET: sunset,
@@ -770,7 +779,7 @@ class GismeteoApiClient:
                     ATTR_FORECAST_CONDITION: self._get(day, "descr"),
                     ATTR_FORECAST_NATIVE_TEMP: self._get(day, "tmax", int),
                     ATTR_FORECAST_NATIVE_TEMP_LOW: self._get(day, "tmin", int),
-                    ATTR_FORECAST_NATIVE_PRESSURE: self._get(day, "p", int) or None,
+                    ATTR_FORECAST_NATIVE_PRESSURE: calc_pressure,  # <-- Теперь тут реальные цифры
                     ATTR_FORECAST_HUMIDITY: self._get(day, "hum", int),
                     ATTR_FORECAST_NATIVE_WIND_SPEED: self._get(day, "ws", int),
                     ATTR_FORECAST_WIND_BEARING: self._get(day, "wd", int),
@@ -804,10 +813,6 @@ class GismeteoApiClient:
                             ),
                         }
                     )
-                    
-                    # НОВЫЙ КОД: Если XML API не отдал прогноз давления, парсим его прямо со страницы
-                    if not data.get(ATTR_FORECAST_NATIVE_PRESSURE):
-                        data[ATTR_FORECAST_NATIVE_PRESSURE] = self._get(parsed, "pressure", int)
 
                 self._forecast_daily.append(data)
 
