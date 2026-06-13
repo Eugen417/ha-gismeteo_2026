@@ -241,7 +241,6 @@ SENSOR_DESCRIPTIONS: Final = (
         key=ATTR_FORECAST_IS_STORM,
         translation_key="is_storm",
         icon="mdi:weather-lightning",
-        state_class=SensorStateClass.MEASUREMENT,
         entity_registry_enabled_default=False,
     ),
     SensorEntityDescription(
