@@ -67,8 +67,8 @@
         "is_storm": {
           "name": "Шторм",
           "state": {
-            "false": "Нет",
-            "true": "Есть"
+            "no": "Нет",
+            "yes": "Есть"
           }
         },
         "geomagnetic_field": {
@@ -170,8 +170,8 @@
         "is_storm_forecast": {
           "name": "Прогноз Шторма {day}д",
           "state": {
-            "false": "Нет",
-            "true": "Есть"
+            "no": "Нет",
+            "yes": "Есть"
           }
         },
         "geomagnetic_field_forecast": {
