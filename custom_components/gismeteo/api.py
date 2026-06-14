@@ -314,7 +314,23 @@ class GismeteoApiClient:
                 for day, row_data in enumerate(items):
                     ts = today + timedelta(days=day)
                     data.setdefault(ts, {})
-                    data[ts][metric] = next(row_data.stripped_strings, None)
+                    
+                    values = [val for val in row_data.stripped_strings]
+                    
+                    if not values:
+                        continue
+
+                    if metric in ["radiation", "gm", "geomagnetic"]:
+                        try:
+                            num_values = [int(v) for v in values if v.isdigit()]
+                            if num_values:
+                                data[ts][metric] = str(max(num_values))
+                            else:
+                                data[ts][metric] = None
+                        except ValueError:
+                            data[ts][metric] = values[0]
+                    else:
+                        data[ts][metric] = values[0]
 
         except AttributeError:  # pragma: no cover
             return {}
@@ -820,6 +836,12 @@ class GismeteoApiClient:
                         data[ATTR_FORECAST_GEOMAGNETIC_FIELD] = self._get(parsed, "gm", int) or self._get(parsed, "geomagnetic", int)
 
                 self._forecast_daily.append(data)
+
+            # Переназначение нулевого текущего геомагнитного фона
+            if self._forecast_daily:
+                today_gm = self._forecast_daily[0].get(ATTR_FORECAST_GEOMAGNETIC_FIELD)
+                if today_gm and not self._current.get(ATTR_FORECAST_GEOMAGNETIC_FIELD):
+                    self._current[ATTR_FORECAST_GEOMAGNETIC_FIELD] = int(today_gm)
 
         except (ETree.ParseError, TypeError, AttributeError) as ex:
             msg = "Can't update weather data! Invalid server response."
