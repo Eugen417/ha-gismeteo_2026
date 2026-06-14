@@ -208,7 +208,7 @@ SENSOR_DESCRIPTIONS: Final = (
     SensorEntityDescription(
         key=ATTR_FORECAST_WIND_BEARING_LABEL,
         translation_key="wind_bearing_label",
-        icon="mdi:weather-windy",
+        icon="mdi:compass-outline",
         entity_registry_enabled_default=False,
     ),
     SensorEntityDescription(
@@ -358,7 +358,7 @@ FORECAST_SENSOR_DESCRIPTIONS: Final = (
     SensorEntityDescription(
         key=ATTR_FORECAST_WIND_BEARING_LABEL,
         translation_key="wind_bearing_label_forecast",
-        icon="mdi:weather-windy",
+        icon="mdi:compass-outline",
         entity_registry_enabled_default=False,
     ),
     SensorEntityDescription(
