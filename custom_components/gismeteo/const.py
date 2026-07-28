@@ -105,8 +105,9 @@ PARSER_USER_AGENT: Final = (
     " Chrome/128.0.0.0 Safari/537.36"
 )
 
-UPDATE_INTERVAL: Final = timedelta(minutes=5)
-PARSED_UPDATE_INTERVAL: Final = timedelta(minutes=61)
+# Опрос основного API раз в 30 минут, парсинг сайта раз в 60 минут
+UPDATE_INTERVAL: Final = timedelta(minutes=30)
+PARSED_UPDATE_INTERVAL: Final = timedelta(minutes=60)
 LOCATION_MAX_CACHE_INTERVAL: Final = timedelta(days=7)
 FORECAST_MAX_CACHE_INTERVAL: Final = timedelta(hours=3)
 
