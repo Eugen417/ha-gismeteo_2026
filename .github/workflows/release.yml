@@ -54,7 +54,8 @@ jobs:
 
       - working-directory: ./custom_components
         run: |
-          echo "release_version=$(git describe --tags | sed s/v//)" >> $GITHUB_ENV
+          # ИСПРАВЛЕНО: Убрали удаление буквы "v" из тега, чтобы скрипт искал правильный релиз
+          echo "release_version=$(git describe --tags)" >> $GITHUB_ENV
 
       - name: "Set up Python"
         if: env.release_version != '' && success()
